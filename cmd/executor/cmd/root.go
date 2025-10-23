@@ -282,6 +282,8 @@ func addKanikoOptionsFlags() {
 	RootCmd.PersistentFlags().BoolVarP(&opts.SkipPushPermissionCheck, "skip-push-permission-check", "", false, "Skip check of the push permission")
 	opts.Annotations = make(map[string]string)
 	RootCmd.PersistentFlags().VarP(&opts.Annotations, "annotation", "", "Set metadata annotations for the image in key=value format. Set it repeatedly for multiple annotations.")
+	opts.Secrets = make(map[string]config.SecretSource)
+	RootCmd.PersistentFlags().VarP(&opts.Secrets, "secret", "", "Secret to mount during build in format id=mysecret,src=/path/to/secret or id=mysecret,env=ENV_VAR. Set it repeatedly for multiple secrets.")
 
 	// Deprecated flags.
 	RootCmd.PersistentFlags().StringVarP(&opts.SnapshotModeDeprecated, "snapshotMode", "", "", "This flag is deprecated. Please use '--snapshot-mode'.")

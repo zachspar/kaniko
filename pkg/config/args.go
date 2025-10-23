@@ -125,3 +125,72 @@ func (c *multiKeyMultiValueArg) Set(value string) error {
 func (c *multiKeyMultiValueArg) Type() string {
 	return "key-multi-value-arg type"
 }
+
+// SecretSource represents a secret that can be mounted during build
+type SecretSource struct {
+	ID     string
+	Source string // file path on the host
+	Env    string // optional: source from environment variable
+}
+
+// secretArg handles --secret flags in the format id=mysecret,src=/path/to/secret
+type secretArg map[string]SecretSource
+
+func (s *secretArg) String() string {
+	var result []string
+	for id, secret := range *s {
+		if secret.Env != "" {
+			result = append(result, fmt.Sprintf("id=%s,env=%s", id, secret.Env))
+		} else {
+			result = append(result, fmt.Sprintf("id=%s,src=%s", id, secret.Source))
+		}
+	}
+	return strings.Join(result, " ")
+}
+
+func (s *secretArg) Set(value string) error {
+	// Parse format: id=mysecret,src=/path/to/secret or id=mysecret,env=MY_ENV_VAR
+	parts := strings.Split(value, ",")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid secret format. expect id=name,src=path or id=name,env=var, got %s", value)
+	}
+
+	var id, src, env string
+	for _, part := range parts {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			return fmt.Errorf("invalid secret parameter: %s", part)
+		}
+		switch kv[0] {
+		case "id":
+			id = kv[1]
+		case "src":
+			src = kv[1]
+		case "env":
+			env = kv[1]
+		default:
+			return fmt.Errorf("unknown secret parameter: %s", kv[0])
+		}
+	}
+
+	if id == "" {
+		return fmt.Errorf("secret id is required")
+	}
+	if src == "" && env == "" {
+		return fmt.Errorf("either src or env must be specified for secret %s", id)
+	}
+	if src != "" && env != "" {
+		return fmt.Errorf("only one of src or env can be specified for secret %s", id)
+	}
+
+	(*s)[id] = SecretSource{
+		ID:     id,
+		Source: src,
+		Env:    env,
+	}
+	return nil
+}
+
+func (s *secretArg) Type() string {
+	return "secret-arg type"
+}

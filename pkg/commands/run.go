@@ -35,8 +35,14 @@ import (
 
 type RunCommand struct {
 	BaseCommand
-	cmd      *instructions.RunCommand
-	shdCache bool
+	cmd              *instructions.RunCommand
+	shdCache         bool
+	availableSecrets map[string]kConfig.SecretSource
+}
+
+// SetSecrets sets the available secrets for this run command
+func (r *RunCommand) SetSecrets(secrets map[string]kConfig.SecretSource) {
+	r.availableSecrets = secrets
 }
 
 // for testing
@@ -49,10 +55,30 @@ func (r *RunCommand) IsArgsEnvsRequiredInCache() bool {
 }
 
 func (r *RunCommand) ExecuteCommand(config *v1.Config, buildArgs *dockerfile.BuildArgs) error {
-	return runCommandInExec(config, buildArgs, r.cmd)
+	return runCommandInExec(config, buildArgs, r.cmd, r.availableSecrets)
 }
 
-func runCommandInExec(config *v1.Config, buildArgs *dockerfile.BuildArgs, cmdRun *instructions.RunCommand) error {
+func runCommandInExec(config *v1.Config, buildArgs *dockerfile.BuildArgs, cmdRun *instructions.RunCommand, availableSecrets map[string]kConfig.SecretSource) error {
+	// Parse and mount secrets if needed
+	secretMounts, err := util.ParseSecretMounts(cmdRun)
+	if err != nil {
+		return errors.Wrap(err, "parsing secret mounts")
+	}
+
+	var mountedSecretPaths []string
+	if len(secretMounts) > 0 {
+		mountedSecretPaths, err = util.MountSecrets(secretMounts, availableSecrets)
+		if err != nil {
+			return errors.Wrap(err, "mounting secrets")
+		}
+		// Ensure secrets are cleaned up after command execution
+		defer func() {
+			if err := util.UnmountSecrets(mountedSecretPaths); err != nil {
+				logrus.Warnf("Failed to unmount secrets: %v", err)
+			}
+		}()
+	}
+
 	var newCommand []string
 	if cmdRun.PrependShell {
 		// This is the default shell on Linux

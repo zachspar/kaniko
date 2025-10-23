@@ -140,6 +140,10 @@ func newStageBuilder(args *dockerfile.BuildArgs, opts *config.KanikoOptions, sta
 		if command == nil {
 			continue
 		}
+		// Inject secrets into RunCommand if available
+		if runCmd, ok := command.(*commands.RunCommand); ok && len(opts.Secrets) > 0 {
+			runCmd.SetSecrets(opts.Secrets)
+		}
 		s.cmds = append(s.cmds, command)
 	}
 
