@@ -19,6 +19,7 @@ package commands
 import (
 	"os"
 
+	kConfig "github.com/chainguard-dev/kaniko/pkg/config"
 	"github.com/chainguard-dev/kaniko/pkg/dockerfile"
 	"github.com/chainguard-dev/kaniko/pkg/util"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -28,16 +29,22 @@ import (
 
 type RunMarkerCommand struct {
 	BaseCommand
-	cmd      *instructions.RunCommand
-	Files    []string
-	shdCache bool
+	cmd              *instructions.RunCommand
+	Files            []string
+	shdCache         bool
+	availableSecrets map[string]kConfig.SecretSource
+}
+
+// SetSecrets sets the available secrets for this run marker command
+func (r *RunMarkerCommand) SetSecrets(secrets map[string]kConfig.SecretSource) {
+	r.availableSecrets = secrets
 }
 
 func (r *RunMarkerCommand) ExecuteCommand(config *v1.Config, buildArgs *dockerfile.BuildArgs) error {
 	// run command `touch filemarker`
 	logrus.Debugf("Using new RunMarker command")
 	prevFilesMap, _ := util.GetFSInfoMap("/", map[string]os.FileInfo{})
-	if err := runCommandInExec(config, buildArgs, r.cmd); err != nil {
+	if err := runCommandInExec(config, buildArgs, r.cmd, r.availableSecrets); err != nil {
 		return err
 	}
 	_, r.Files = util.GetFSInfoMap("/", prevFilesMap)
